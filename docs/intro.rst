@@ -23,7 +23,7 @@ DAG Relay Service это сервис для упрощение работы с 
 
 Основные сущности:
 
-- проект (имя, токен, описание, url endpoint для фетчинга DAGов, настройки git репы)
+- проект (имя, токен, описание, url endpoint для фетчинга DAGов, настройки git репы, scheduling policies)
 - DAG/resource (YAML) (проект, имя, id, описание, YAML)
 - update event (событие обновления, не обязательно приводит к deploymentу)
 - deployment (сам акт выкадки ресурсов)
@@ -38,6 +38,7 @@ DAG Relay Service это сервис для упрощение работы с 
 - circe
 - pureconfig
 - хз че для git клиента? Видимо сами напишем обвязку
+- scheduler
 
 .. |diagram| image:: scheme.png
 .. |components| image:: components.png
