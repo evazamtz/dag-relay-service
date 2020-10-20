@@ -13,6 +13,21 @@ DAG Relay Service это сервис для упрощение работы с 
 - добавить возможность генерить динамические YAMLы со стороны проекта
 - сделать всё это прозрачно для команды DataMeshа, для них в итоге всё это будет выглядеть как push в git репозиторий
 
+Основные компоненты системы: |components|
+
+- ядро
+- git repo client
+- http endpoint for DAG pushes
+- scheduler
+- dag/resource fetcher (http client)
+
+Основные сущности:
+
+- проект (имя, токен, описание, url endpoint для фетчинга DAGов, настройки git репы)
+- DAG/resource (YAML) (проект, имя, id, описание, YAML)
+- update event (событие обновления, не обязательно приводит к deploymentу)
+- deployment (сам акт выкадки ресурсов)
 
 .. |diagram| image:: scheme.png
+.. |components| image:: components.png
 
