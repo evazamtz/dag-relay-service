@@ -28,6 +28,17 @@ DAG Relay Service это сервис для упрощение работы с 
 - update event (событие обновления, не обязательно приводит к deploymentу)
 - deployment (сам акт выкадки ресурсов)
 
+Предлагаемый stack:
+
+- Scala 2.13
+- ZIO 1.0
+- http4s для web сервера
+- sttp для http клиента
+- doobie (если хранилище PG)
+- circe
+- pureconfig
+- хз че для git клиента? Видимо сами напишем обвязку
+
 .. |diagram| image:: scheme.png
 .. |components| image:: components.png
 
