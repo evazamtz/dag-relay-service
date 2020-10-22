@@ -1,20 +1,35 @@
+import org.http4s._
+import org.http4s.dsl._
+import org.http4s.implicits._
+import org.http4s.server.Router
+import org.http4s.server.blaze.BlazeServerBuilder
+import zio._
+import zio.interop.catz._
+import zio.interop.catz.implicits._
 
-object Main extends IOApp {
+object Main extends CatsApp {
 
-  implicit val ctx = IO.contextShift(ExecutionContext.global)
+  def routes: HttpRoutes[Task] = {
 
-  def run(args: List[String]): IO[ExitCode] = for {
-    appConfig <- IO fromEither { ConfigSource.default.load[AppConfig].leftMap(crf => new Exception("Failed to read application config" + crf)) }
-    _         <- IO { println ("Loaded application conf: " + appConfig) }
-    semaphore <- Semaphore[IO](1)
-    repo      = new LocalFileTodoRepository(appConfig.repo.localFile.path, semaphore)
-    exitCode  <- BlazeServerBuilder[IO]
-      .bindHttp(appConfig.http.port, appConfig.http.host)
-      .withHttpApp( TodoService.build(repo) )
+    val dsl = new Http4sDsl[Task] {}
+    import dsl._
+
+    HttpRoutes.of[Task] {
+      case _@GET -> Root / "dags" => Ok("ok!")
+    }
+  }
+
+  val httpRoutes = Router[Task](
+    "/" -> routes
+  ).orNotFound
+
+  def run(args: List[String]): URIO[ZEnv, ExitCode] = {
+    BlazeServerBuilder.apply[Task](scala.concurrent.ExecutionContext.global)
+      .bindHttp(9000, "0.0.0.0")
+      .withHttpApp(httpRoutes)
       .serve
-      .compile
+      .compile[Task, Task, cats.effect.ExitCode]
       .drain
-      .as(ExitCode.Success)
-  } yield exitCode
-
+      .fold(_ => ExitCode.failure, _ => ExitCode.success)
+  }
 }

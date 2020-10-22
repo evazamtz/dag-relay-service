@@ -2,11 +2,11 @@ name := "dag-relay-service"
 
 version := "1.0"
 
-scalaVersion := "2.13"
+scalaVersion := "2.13.3"
 
-val zioVersion = "1.0.1"
+val zioVersion = "1.0.3"
 val circeVersion = "0.12.3"
-val http4sVersion = "0.21"
+val http4sVersion = "0.21.8"
 
 // Only necessary for SNAPSHOT releases
 resolvers += Resolver.sonatypeRepo("snapshots")
@@ -19,7 +19,7 @@ libraryDependencies ++= Seq(
 
 libraryDependencies ++= Seq(
   "dev.zio" %% "zio" % zioVersion,
-  "dev.zio" %% "zio-interop-cats" % zioVersion,
+  "dev.zio" %% "zio-interop-cats" % "2.2.0.1",
 
   "org.http4s" %% "http4s-dsl" % http4sVersion,
   "org.http4s" %% "http4s-blaze-server" % http4sVersion,
@@ -28,10 +28,8 @@ libraryDependencies ++= Seq(
   // Optional for string interpolation to JSON model
 
   "org.slf4j" % "slf4j-simple" % "1.7.22",
-  "org.slf4j" % "slf4j-api" % "1.7.22",
+  "org.slf4j" % "slf4j-api" % "1.7.22"
 
-  "org.scala-lang" % "scala-reflect" % scalaVersion.value ,
-  "com.github.pureconfig" %% "pureconfig" % "0.12.3"
+  //"org.scala-lang" % "scala-reflect" % scalaVersion.value ,
+  //"com.github.pureconfig" %% "pureconfig" % "0.12.3"
 )
-
-scalacOptions ++= Seq("-Ypartial-unification")
