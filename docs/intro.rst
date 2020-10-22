@@ -20,6 +20,8 @@ DAG Relay Service это сервис для упрощение работы с 
 - http endpoint for DAG pushes
 - scheduler
 - dag/resource fetcher (http client)
+- entity storage
+- cli interface
 
 Основные сущности:
 
@@ -35,10 +37,12 @@ DAG Relay Service это сервис для упрощение работы с 
 - http4s для web сервера
 - sttp для http клиента
 - doobie (если хранилище PG)
-- circe
+- circe для Json
 - pureconfig
 - хз че для git клиента? Видимо сами напишем обвязку
 - scheduler
+- что-то для запуска в режиме CLI (есть либа decline http://ben.kirw.in/decline/)
+- что для логирования?
 
 .. |diagram| image:: scheme.png
 .. |components| image:: components.png
