@@ -1,4 +1,4 @@
-name := "dag-relay-service"
+name := "dag-relay-service" // DRS
 
 version := "1.0"
 
