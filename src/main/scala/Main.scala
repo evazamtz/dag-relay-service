@@ -1,35 +1,38 @@
-import org.http4s._
-import org.http4s.dsl._
-import org.http4s.implicits._
-import org.http4s.server.Router
-import org.http4s.server.blaze.BlazeServerBuilder
 import zio._
+import zio.console._
 import zio.interop.catz._
 import zio.interop.catz.implicits._
 
-object Main extends CatsApp {
+import org.http4s._
+import org.http4s.dsl.Http4sDsl
+import org.http4s.implicits._
+import org.http4s.server.blaze.BlazeServerBuilder
 
-  def routes: HttpRoutes[Task] = {
+object Main extends App {
 
-    val dsl = new Http4sDsl[Task] {}
-    import dsl._
+  private val dsl = Http4sDsl[Task]
+  import dsl._
 
-    HttpRoutes.of[Task] {
-      case _@GET -> Root / "dags" => Ok("ok!")
+  private val helloWorldService = HttpRoutes
+    .of[Task] {
+      case GET -> Root / "dags" => Ok("OK!")
     }
-  }
+    .orNotFound
 
-  val httpRoutes = Router[Task](
-    "/" -> routes
-  ).orNotFound
+  def run(args: List[String]): zio.URIO[zio.ZEnv, ExitCode] =
+    ZIO
+      .runtime[ZEnv]
+      .flatMap { implicit runtime =>
+        BlazeServerBuilder[Task](runtime.platform.executor.asEC)
+          .bindHttp(8080, "localhost")
+          .withHttpApp(helloWorldService)
+          .resource
+          .toManagedZIO
+          .useForever
+          .foldCauseM(
+            err => putStrLn(err.prettyPrint).as(ExitCode.failure),
+            _ => ZIO.succeed(ExitCode.success)
+          )
+      }
 
-  def run(args: List[String]): URIO[ZEnv, ExitCode] = {
-    BlazeServerBuilder.apply[Task](scala.concurrent.ExecutionContext.global)
-      .bindHttp(9000, "0.0.0.0")
-      .withHttpApp(httpRoutes)
-      .serve
-      .compile[Task, Task, cats.effect.ExitCode]
-      .drain
-      .fold(_ => ExitCode.failure, _ => ExitCode.success)
-  }
 }
