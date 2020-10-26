@@ -1,16 +1,25 @@
-import zio.{Has, UIO}
+import zio.{Has, Task, UIO, ULayer, URIO, ZIO, ZLayer}
+import pureconfig.ConfigSource
+import pureconfig.generic.auto._
 
-package object conf {
+package object config {
 
-  case class AppConf()
-  case class LogConf()
-  case class StorageConf()
+  case class AppConf(api:ApiConf, storage:StorageConf)
+  case class ApiConf(host:String, port:Int)
+  case class StorageConf(backend:String)
 
-  type Conf = Has[Service]
+  type Config = Has[Service]
 
   trait Service {
-    def load: UIO[AppConf]
+    def app: UIO[AppConf]
   }
-}
 
-// CRUD???
+  val live: ZLayer[Any, Throwable, Config] = ZLayer.fromEffect(
+    for {
+      conf <- ZIO.fromEither(ConfigSource.default.load[AppConf]).mapError(cfs => new Throwable(cfs.toString))
+    } yield new Service { def app = ZIO.succeed(conf) }
+  )
+
+  // helpers
+  def app: URIO[Config, AppConf] = ZIO.accessM[Config](_.get.app)
+}
