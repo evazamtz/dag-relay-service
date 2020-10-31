@@ -15,7 +15,7 @@ package object modules {
 
   val inMemory: ZLayer[Any, Nothing, Storage] = ZLayer.fromEffect(
     for {
-      projects <- Ref.make(MMap[String, Project]("core" -> Project("core", "jahsdjksasd", "https://api.pimpay.ru/datamesh/dags", GitRepoSettings())))
+      projects <- Ref.make(MMap[String, Project]("core" -> Project("core", "jahsdjksasd", "https://api.pimpay.ru/datamesh/dags", GitRepoSettings("", "", "", ""))))
       dags     <- Ref.make(MMap[(String,String), Dag]())
     } yield (new InMemory(projects, dags)).asInstanceOf[storage.Service]
   )

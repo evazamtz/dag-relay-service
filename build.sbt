@@ -31,5 +31,7 @@ libraryDependencies ++= Seq(
   "org.slf4j" % "slf4j-api" % "1.7.22",
 
   //"org.scala-lang" % "scala-reflect" % scalaVersion.value ,
-  "com.github.pureconfig" %% "pureconfig" % "0.14.0"
+  "com.github.pureconfig" %% "pureconfig" % "0.14.0",
+
+  "com.softwaremill.sttp.client3" %% "core" % "3.0.0-RC7"
 )

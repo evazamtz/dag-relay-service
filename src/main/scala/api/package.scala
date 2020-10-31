@@ -1,3 +1,6 @@
+import config.Config
+import domain.{Dag, GitRepoSettings}
+import git.Git
 import zio._
 import zio.interop.catz._
 import zio.interop.catz.implicits._
@@ -5,7 +8,6 @@ import org.http4s._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.implicits._
 import storage.Storage
-
 import io.circe._
 import io.circe.generic.auto._
 import io.circe.syntax._
@@ -13,25 +15,46 @@ import io.circe.syntax._
 
 package object api {
 
-  def buildRoutes(dsl:Http4sDsl[Task]):URIO[Storage, HttpApp[Task]] = for {
-    storage <- ZIO.access[Storage](_.get)
-  } yield routes(dsl, storage)
+  def buildRoutes(dsl:Http4sDsl[Task]):URIO[Storage with Config with Git, HttpApp[Task]] = {
 
-  protected def routes(dsl:Http4sDsl[Task], repo: storage.Service):HttpApp[Task] = {
     import dsl._
 
-    val service = HttpRoutes
-      .of[Task] {
+    for {
+      repo    <- ZIO.access[Storage](_.get)
+      appConf <- ZIO.access[Config](_.get)
+      git     <- ZIO.access[Git](_.get)
 
-        case GET -> Root / "ping" => Ok("pong")
-        case GET -> Root / "projects" => for {
-          projects <- repo.getProjects
-          response <- Ok(Json.obj("projects" -> projects.asJson).noSpaces)
-        } yield response
+      service = HttpRoutes.of[Task]
+        {
 
-      }.orNotFound
-    service
+          case GET -> Root / "ping" => Ok("pong")
+          case GET -> Root / "projects" => for {
+            projects <- repo.getProjects
+            appConfig <- appConf.app
+            response <- Ok(Json.obj("projects" -> projects.asJson, "host" ->  appConfig.api.host.asJson).noSpaces)
+          } yield response
+          case GET -> Root / "pushTest" => {
+
+            val source = scala.io.Source.fromFile("yaml.yaml")
+            val content = try {
+                source.getLines.mkString
+              } finally source.close()
+
+            val testDag = Dag("project", "name", content)
+            val testRepositorySettings = GitRepoSettings(
+              "https://gitlab.pimpay.ru/vera.miroshnichenko/testdags/commits",
+              "master",
+              "dags",
+              "XCTfLibYUWb2Xtzmyz2y"
+            )
+
+            for {
+              response <- Ok(git.syncDag(testDag, testRepositorySettings))
+            } yield response
+          }
+
+        }.orNotFound
+
+    } yield service
   }
 }
-
-
