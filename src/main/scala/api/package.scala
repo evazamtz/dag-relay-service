@@ -40,17 +40,15 @@ package object api {
                 source.getLines.mkString
               } finally source.close()
 
-            val testDag = Dag("project", "name", content)
+            val testDag = Dag("project", "zhuzhuzhu", content)
             val testRepositorySettings = GitRepoSettings(
-              "https://gitlab.pimpay.ru/vera.miroshnichenko/testdags/commits",
+              "https://gitlab.pimpay.ru/api/v4/projects/294/repository/files",
               "master",
               "dags",
               "XCTfLibYUWb2Xtzmyz2y"
             )
 
-            for {
-              response <- Ok(git.syncDag(testDag, testRepositorySettings))
-            } yield response
+            git.syncDag(testDag, testRepositorySettings) *> Ok("kukujopa")
           }
 
         }.orNotFound

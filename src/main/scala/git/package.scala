@@ -1,74 +1,104 @@
+import java.net.URLEncoder
+
 import domain.{Dag, GitRepoSettings, Project}
-import zio._
+import zio.{Task, _}
 import io.circe._
 import io.circe.generic.auto._
 import io.circe.syntax._
 import sttp.client3._
-
+import sttp.model.StatusCode
 
 
 package object git {
   type Git = Has[Service]
 
   trait Service {
-    def syncDag(dag: Dag, gitRepoSettings: GitRepoSettings): Task[String]
+    def syncDag(dag: Dag, gitRepoSettings: GitRepoSettings): Task[Unit]
 
-    def createActions(dag: Dag, gitRepoSettings: GitRepoSettings) : UIO[Seq[Action]]
-    def createPayload(dag: Dag, gitRepoSettings: GitRepoSettings, actions: Seq[Action]) : UIO[Payload]
-    def createHeaders(gitRepoSettings: GitRepoSettings) : UIO[Map[String, String]]
+    def createHeaders(gitRepoSettings: GitRepoSettings): UIO[Map[String, String]]
+
+    def createPath(dag: Dag, gitRepoSettings: GitRepoSettings): UIO[String]
+
+    def createCommitMsg(dag: Dag): UIO[String]
 
     def createRequest(dag: Dag, gitRepoSettings: GitRepoSettings): Task[GitRequest] = for {
-        actions <- createActions(dag, gitRepoSettings)
-        payload <- createPayload(dag, gitRepoSettings, actions)
-        headers <- createHeaders(gitRepoSettings)
-        request <- Task {
-            GitRequest(
-              gitRepoSettings.repository,
-              payload,
-              headers
-            )
-        }
-      } yield request
-   }
+      commitMsg <- createCommitMsg(dag)
+      headers   <- createHeaders(gitRepoSettings)
+      path      <- createPath(dag, gitRepoSettings)
+      request   <- Task {
+        GitRequest(
+          s"${gitRepoSettings.repository}/$path",
+          gitRepoSettings.branch,
+          commitMsg,
+          dag.payload,
+          headers
+        )
+      }
+    } yield request
+  }
 
-  case class GitRequest(uri: String, payload: Payload, headers: Map[String, String])
-  case class Payload(branch: String, commit_message: String, actions: Seq[Action])
-  case class Action(action: String, file_path: String, content: String)
-
+  case class GitRequest(uri: String, branch: String, commit_message: String, content: String, headers: Map[String, String])
 
 
   val live: ZLayer[Any, Nothing, Git] = ZLayer.fromEffect(
 
     ZIO.succeed {
       new Service {
-        def syncDag(dag: Dag, gitRepoSettings: GitRepoSettings): Task[String] = {
 
-          val backend = HttpURLConnectionBackend()
-
+        def syncDag(dag: Dag, gitRepoSettings: GitRepoSettings): Task[Unit] = {
           for {
             request <- createRequest(dag, gitRepoSettings)
-            response <- Task
-            {
-               quickRequest
-                .headers(request.headers)
-                .contentType("application/json")
-                .body(request.payload.asJson.noSpaces)
-                .post(uri"${request.uri}")
-                .send(backend)
-            }
-          } yield (response.body)
+            _       <- processFile(request)
+          } yield ()
         }
 
-        override def createActions(dag: Dag, gitRepoSettings: GitRepoSettings): UIO[Seq[Action]] = ZIO.succeed(Seq(
-          Action("create", s"${gitRepoSettings.path}\\${dag.project}_${dag.name}.yaml", raw"${dag.payload}"))
-        )
+        def processFile(request: GitRequest) : Task[Unit] =  {
+          for {
+            file <- getRawFile(request)
+            _    <- if (file.code == StatusCode.NotFound) createFile(request)
+                    else {
+                      if (file.body != request.content) updateFile(request)
+                      else ZIO.unit
+                    }
+          } yield ()
+        }
 
-        override def createPayload(dag: Dag, gitRepoSettings: GitRepoSettings, actions: Seq[Action]): UIO[Payload] = ZIO.succeed(
-          Payload(gitRepoSettings.branch, s"from ${dag.project}", actions)
-        )
+        def createFile(request: GitRequest) : Task[Response[String]] = Task {
+          quickRequest
+            .headers(request.headers)
+            .contentType("application/json")
+            .body(request.asJson.noSpaces)
+            .post(uri"${request.uri}")
+            .send(HttpURLConnectionBackend())
+        }
 
-        override def createHeaders(gitRepoSettings: GitRepoSettings): UIO[Map[String, String]] =  ZIO.succeed(
-          Map("Content-Type" -> "application/json", "PRIVATE-TOKEN" -> gitRepoSettings.privateToken)
+        def updateFile(request: GitRequest): Task[Response[String]] = Task {
+          quickRequest
+            .headers(request.headers)
+            .contentType("application/json")
+            .body(request.asJson.noSpaces)
+            .put(uri"${request.uri}")
+            .send(HttpURLConnectionBackend())
+        }
+
+        def getRawFile(request: GitRequest): Task[Response[String]] = Task {
+          quickRequest
+            .headers(request.headers)
+            .contentType("application/json")
+            .get(uri"${request.uri}/raw?ref=${request.branch}")
+            .send(HttpURLConnectionBackend())
+        }
+
+
+        def createPath(dag: Dag, gitRepoSettings: GitRepoSettings): UIO[String] = ZIO.succeed {
+          URLEncoder.encode(s"${gitRepoSettings.path}/${dag.project}_${dag.name}.yaml", "UTF-8")
+        }
+
+
+        override def createCommitMsg(dag: Dag): UIO[String] = ZIO.succeed(s"from ${dag.project}")
+
+        override def createHeaders(gitRepoSettings: GitRepoSettings): UIO[Map[String, String]] = ZIO.succeed(
+          Map(/*"Content-Type" -> "application/json", */ "PRIVATE-TOKEN" -> gitRepoSettings.privateToken)
         )
       }
     }
