@@ -61,7 +61,7 @@ package object api {
           "RtPpsq7iiFv2xQiDdU8J"
         )
 
-        git.syncDag(testDag, testRepositorySettings) *> Ok("kukujopa")
+        theGit.syncDag(testDag, testRepositorySettings) *> Ok("kukujopa")
       }
 
 
