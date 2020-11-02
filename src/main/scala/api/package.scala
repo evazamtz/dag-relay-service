@@ -36,10 +36,10 @@ package object api {
       } yield response
 
       case request @ POST -> Root / "projects" / projectName / "dags" / dag => for {
-        token       <- request.headers.get(CaseInsensitiveString("X-Project-Token")) getOrFail ApiException(BadRequest, "X-Project-Name is required")
+        token       <- request.headers.get(CaseInsensitiveString("X-Project-Token")).map(_.value) getOrFail ApiException(BadRequest, "X-Project-Name is required")
         projects    <- repo.getProjects
         project     <- projects.get(projectName) getOrFail ApiException(NotFound, s"Project $projectName was not found")
-        _           <- ZIO.ensureOrFail(project.token == token, ApiException(Forbidden, "Invalid project token"))
+        _           <- ZIO.ensureOrFail(project.token == token, ApiException(Forbidden, s"Invalid token '$token' for project '$projectName'"))
         payload     <- request.body.through(fs2.text.utf8Decode).compile.string
         _           <- theGit.syncDag(Dag(projectName, dag, payload), project.git)
         response    <- Ok("Synced")
