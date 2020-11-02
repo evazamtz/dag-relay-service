@@ -14,6 +14,9 @@ package object modules {
 
   class GitLive extends git.Service {
 
+    // TODO: вынести в зависимость
+    implicit val backend:SttpBackend[Identity, Nothing, NothingT] = HttpURLConnectionBackend()
+
     override def syncDag(dag: Dag, gitRepoSettings: GitRepoSettings): Task[Unit] = for {
       request <- createRequest(dag, gitRepoSettings)
       _       <- processFile(request)
@@ -40,34 +43,31 @@ package object modules {
         _ <- ZIO.when(found && file.body != request.content)(updateFile(request))
     } yield ()
 
-    def createFile(request: GitRequest): Task[Response[_]] = Task {
-      implicit val backend = HttpURLConnectionBackend()
+    def createFile(request: GitRequest): Task[Response[String]] = Task {
       quickRequest
         .headers(request.headers)
         .contentType("application/json")
         .body(request.asJson.noSpaces)
         .post(uri"${request.uri}")
-        .send()
+        .send[Identity]()
     }
 
-    def updateFile(request: GitRequest): Task[Response[_]] = Task {
-      implicit val backend = HttpURLConnectionBackend()
+    def updateFile(request: GitRequest): Task[Response[String]] = Task {
       quickRequest
         .headers(request.headers)
         .contentType("application/json")
         .body(request.asJson.noSpaces)
         .put(uri"${request.uri}")
-        .send()
+        .send[Identity]()
     }
 
-    def getRawFile(request: GitRequest): Task[Response[_]] = Task {
-      implicit val backend = HttpURLConnectionBackend()
 
+    def getRawFile(request: GitRequest): Task[Response[String]] = Task {
       quickRequest
         .headers(request.headers)
         .contentType("application/json")
         .get(uri"${request.uri}/raw?ref=${request.branch}")
-        .send()
+        .send[Identity]()
     }
 
 
