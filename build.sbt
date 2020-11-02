@@ -31,5 +31,11 @@ libraryDependencies ++= Seq(
   "org.slf4j" % "slf4j-api" % "1.7.22",
 
   //"org.scala-lang" % "scala-reflect" % scalaVersion.value ,
-  "com.github.pureconfig" %% "pureconfig" % "0.14.0"
+  "com.github.pureconfig" %% "pureconfig" % "0.14.0",
+
+    "dev.zio" %% "zio-test"     % zioVersion % "test",
+    "dev.zio" %% "zio-test-sbt" % zioVersion % "test"
+   // "dev.zio" %% "zio-test-magnolia" % zioVersion % "test" // optional
 )
+
+testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")
