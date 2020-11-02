@@ -36,7 +36,8 @@ package object api {
       } yield response
 
       case request @ POST -> Root / "projects" / projectName / "dags" / dag => for {
-        token       <- request.headers.get(CaseInsensitiveString("X-Project-Token")).map(_.value) getOrFail ApiException(BadRequest, "X-Project-Name is required")
+        tokenHeader <- request.headers.get(CaseInsensitiveString("X-Project-Token")) getOrFail ApiException(BadRequest, "X-Project-Name is required")
+        token       = tokenHeader.value
         projects    <- repo.getProjects
         project     <- projects.get(projectName) getOrFail ApiException(NotFound, s"Project $projectName was not found")
         _           <- ZIO.ensureOrFail(project.token == token, ApiException(Forbidden, s"Invalid token '$token' for project '$projectName'"))
