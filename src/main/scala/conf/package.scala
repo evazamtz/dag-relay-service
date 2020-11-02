@@ -4,9 +4,8 @@ import pureconfig.generic.auto._
 
 package object config {
 
-  case class AppConf(api:ApiConf, storage:StorageConf)
+  case class AppConf(api:ApiConf)
   case class ApiConf(host:String, port:Int)
-  case class StorageConf(backend:String)
 
   type Config = Has[Service]
 
