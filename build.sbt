@@ -33,5 +33,11 @@ libraryDependencies ++= Seq(
   //"org.scala-lang" % "scala-reflect" % scalaVersion.value ,
   "com.github.pureconfig" %% "pureconfig" % "0.14.0",
 
-  "com.softwaremill.sttp.client" %% "core" % "2.2.9"
+  "com.softwaremill.sttp.client" %% "core" % "2.2.9",
+
+  "dev.zio" %% "zio-test"     % zioVersion % "test",
+  "dev.zio" %% "zio-test-sbt" % zioVersion % "test"
+   // "dev.zio" %% "zio-test-magnolia" % zioVersion % "test" // optional
 )
+
+testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")
