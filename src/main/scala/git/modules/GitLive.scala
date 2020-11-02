@@ -17,24 +17,21 @@ package object modules {
     // TODO: вынести в зависимость
     implicit val backend:SttpBackend[Identity, Nothing, NothingT] = HttpURLConnectionBackend()
 
-    override def syncDag(dag: Dag, gitRepoSettings: GitRepoSettings): Task[Unit] = for {
-      request <- createRequest(dag, gitRepoSettings)
-      _       <- processFile(request)
-    } yield ()
+    override def syncDag(dag: Dag, gitRepoSettings: GitRepoSettings): Task[Unit] = processFile(createRequest(dag, gitRepoSettings))
 
     case class GitRequest(uri: String, branch: String, commit_message: String, content: String, headers: Map[String, String])
 
-    def createRequest(dag: Dag, gitRepoSettings: GitRepoSettings): Task[GitRequest] = for {
-      commitMsg <- createCommitMsg(dag)
-      headers   <- createHeaders(gitRepoSettings)
-      path      <- createPath(dag, gitRepoSettings)
-    } yield GitRequest(
-      s"${gitRepoSettings.repository}/$path",
-      gitRepoSettings.branch,
-      commitMsg,
-      dag.payload,
-      headers
-    )
+    def createRequest(dag: Dag, gitRepoSettings: GitRepoSettings): GitRequest = {
+      val path = createPath(dag, gitRepoSettings)
+
+      GitRequest(
+        s"${gitRepoSettings.repository}/$path",
+        gitRepoSettings.branch,
+        createCommitMsg(dag),
+        dag.payload,
+        createHeaders(gitRepoSettings)
+      )
+    }
 
     def processFile(request: GitRequest): Task[Unit] = for {
         file     <- getRawFile(request)
@@ -70,16 +67,10 @@ package object modules {
         .send[Identity]()
     }
 
+    def createPath(dag: Dag, gitRepoSettings: GitRepoSettings): String = URLEncoder.encode(s"${gitRepoSettings.path}/${dag.project}_${dag.name}.yaml", "UTF-8")
 
-    def createPath(dag: Dag, gitRepoSettings: GitRepoSettings): UIO[String] = ZIO.succeed {
-      URLEncoder.encode(s"${gitRepoSettings.path}/${dag.project}_${dag.name}.yaml", "UTF-8")
-    }
+    def createCommitMsg(dag: Dag): String = s"from ${dag.project}"
 
-    def createCommitMsg(dag: Dag): UIO[String] = ZIO.succeed(s"from ${dag.project}")
-
-    def createHeaders(gitRepoSettings: GitRepoSettings): UIO[Map[String, String]] = ZIO.succeed(
-      Map("PRIVATE-TOKEN" -> gitRepoSettings.privateToken)
-    )
+    def createHeaders(gitRepoSettings: GitRepoSettings): Map[String, String] = Map("PRIVATE-TOKEN" -> gitRepoSettings.privateToken)
   }
-
 }
