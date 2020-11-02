@@ -14,43 +14,33 @@ package object modules {
 
   class GitLive extends git.Service {
 
-    override def syncDag(dag: Dag, gitRepoSettings: GitRepoSettings): Task[Unit] = {
-      for {
-        request <- createRequest(dag, gitRepoSettings)
-        _ <- processFile(request)
-      } yield ()
-    }
+    override def syncDag(dag: Dag, gitRepoSettings: GitRepoSettings): Task[Unit] = for {
+      request <- createRequest(dag, gitRepoSettings)
+      _       <- processFile(request)
+    } yield ()
 
     case class GitRequest(uri: String, branch: String, commit_message: String, content: String, headers: Map[String, String])
 
     def createRequest(dag: Dag, gitRepoSettings: GitRepoSettings): Task[GitRequest] = for {
       commitMsg <- createCommitMsg(dag)
-      headers <- createHeaders(gitRepoSettings)
-      path <- createPath(dag, gitRepoSettings)
-      request <- Task {
-        GitRequest(
-          s"${gitRepoSettings.repository}/$path",
-          gitRepoSettings.branch,
-          commitMsg,
-          dag.payload,
-          headers
-        )
-      }
-    } yield request
+      headers   <- createHeaders(gitRepoSettings)
+      path      <- createPath(dag, gitRepoSettings)
+    } yield GitRequest(
+      s"${gitRepoSettings.repository}/$path",
+      gitRepoSettings.branch,
+      commitMsg,
+      dag.payload,
+      headers
+    )
 
-    def processFile(request: GitRequest): Task[Unit] = {
-      for {
-        file <- getRawFile(request)
-        _ <- if (file.code == StatusCode.NotFound) createFile(request)
-        else {
-          if (file.body != request.content) updateFile(request)
-          else ZIO.unit
-        }
-      } yield ()
-    }
+    def processFile(request: GitRequest): Task[Unit] = for {
+        file     <- getRawFile(request)
+        found     = file.code != StatusCode.NotFound
+        _ <- ZIO.when(!found)(createFile(request))
+        _ <- ZIO.when(found && file.body != request.content)(updateFile(request))
+    } yield ()
 
     def createFile(request: GitRequest): Task[Response[_]] = Task {
-
       implicit val backend = HttpURLConnectionBackend()
       quickRequest
         .headers(request.headers)
@@ -61,9 +51,7 @@ package object modules {
     }
 
     def updateFile(request: GitRequest): Task[Response[_]] = Task {
-
       implicit val backend = HttpURLConnectionBackend()
-
       quickRequest
         .headers(request.headers)
         .contentType("application/json")
