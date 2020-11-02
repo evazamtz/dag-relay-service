@@ -1,4 +1,4 @@
-import domain.Dag
+import domain.{Dag, GitRepoSettings}
 import fs2.Stream
 import fs2.text.utf8Encode
 import git.Git
@@ -45,6 +45,25 @@ package object api {
         _           <- theGit.syncDag(Dag(projectName, dag, payload), project.git)
         response    <- Ok("Synced")
       } yield response
+
+      case GET -> Root / "pushTest" => {
+
+        val source = scala.io.Source.fromFile("yaml.yaml")
+        val content = try {
+          source.getLines.mkString
+        } finally source.close()
+
+        val testDag = Dag("project", "test", content)
+        val testRepositorySettings = GitRepoSettings(
+          "https://gitlab.pimpay.ru/api/v4/projects/294/repository/files",
+          "master",
+          "dags",
+          "RtPpsq7iiFv2xQiDdU8J"
+        )
+
+        theGit.syncDag(testDag, testRepositorySettings) *> Ok("kukujopa")
+      }
+
 
 
     }
