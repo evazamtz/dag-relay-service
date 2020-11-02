@@ -13,7 +13,7 @@ import io.circe._
 import io.circe.generic.auto._
 import io.circe.syntax._
 import org.http4s.util.CaseInsensitiveString
-import utils._
+import zio.sugar._
 
 package object api {
 
