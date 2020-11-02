@@ -16,7 +16,7 @@ object HelloWorldSpec extends DefaultRunnableSpec {
       for {
         _      <- sayHello
         output <- TestConsole.output
-      } yield assert(output)(equalTo(Vector("Hello, World!\n")))
+      } yield assert(output)(equalTo(Vector("Hello, Wцorld!\n")))
     }
   )
 }
