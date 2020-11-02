@@ -33,5 +33,5 @@ libraryDependencies ++= Seq(
   //"org.scala-lang" % "scala-reflect" % scalaVersion.value ,
   "com.github.pureconfig" %% "pureconfig" % "0.14.0",
 
-  "com.softwaremill.sttp.client3" %% "core" % "3.0.0-RC7"
+  "com.softwaremill.sttp.client" %% "core" % "2.2.9"
 )
