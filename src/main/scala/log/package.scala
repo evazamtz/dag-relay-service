@@ -9,3 +9,5 @@ package object log {
     // tobo: make a better algebra
   }
 }
+
+// TODO: zio-logging + sl4fj backend

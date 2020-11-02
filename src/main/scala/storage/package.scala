@@ -1,4 +1,4 @@
-import zio.{Has, Task, ZLayer}
+import zio.{Has, Task}
 import domain._
 
 package object storage {
@@ -7,7 +7,5 @@ package object storage {
 
   trait Service {
     def getProjects:Task[Seq[Project]]
-    def getDagsByProject(project:String):Task[Seq[Dag]]
-    def findDag(project:String, name:String):Task[Option[Dag]]
   }
 }
