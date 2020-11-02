@@ -18,5 +18,5 @@ package object git {
     override def syncDag(dag: Dag, gitRepoSettings: GitRepoSettings): Task[Unit] = Task.unit
   })
 
-  val live: ZLayer[Any, Nothing, Git] = ZLayer.fromEffect( ZIO.succeed(new GitLive))
+  val live: ZLayer[Any, Nothing, Git] = ZLayer.succeed(new GitLive)
 }
