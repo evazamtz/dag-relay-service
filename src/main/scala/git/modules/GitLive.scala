@@ -14,84 +14,63 @@ package object modules {
 
   class GitLive extends git.Service {
 
-    override def syncDag(dag: Dag, gitRepoSettings: GitRepoSettings): Task[Unit] = {
-      for {
-        request <- createRequest(dag, gitRepoSettings)
-        _ <- processFile(request)
-      } yield ()
-    }
+    // TODO: вынести в зависимость
+    implicit val backend:SttpBackend[Identity, Nothing, NothingT] = HttpURLConnectionBackend()
+
+    override def syncDag(dag: Dag, gitRepoSettings: GitRepoSettings): Task[Unit] = processFile(createRequest(dag, gitRepoSettings))
 
     case class GitRequest(uri: String, branch: String, commit_message: String, content: String, headers: Map[String, String])
 
-    def createRequest(dag: Dag, gitRepoSettings: GitRepoSettings): Task[GitRequest] = for {
-      commitMsg <- createCommitMsg(dag)
-      headers <- createHeaders(gitRepoSettings)
-      path <- createPath(dag, gitRepoSettings)
-      request <- Task {
-        GitRequest(
-          s"${gitRepoSettings.repository}/$path",
-          gitRepoSettings.branch,
-          commitMsg,
-          dag.payload,
-          headers
-        )
-      }
-    } yield request
+    def createRequest(dag: Dag, gitRepoSettings: GitRepoSettings): GitRequest = {
+      val path = createPath(dag, gitRepoSettings)
 
-    def processFile(request: GitRequest): Task[Unit] = {
-      for {
-        file <- getRawFile(request)
-        _ <- if (file.code == StatusCode.NotFound) createFile(request)
-        else {
-          if (file.body != request.content) updateFile(request)
-          else ZIO.unit
-        }
-      } yield ()
+      GitRequest(
+        s"${gitRepoSettings.repository}/$path",
+        gitRepoSettings.branch,
+        createCommitMsg(dag),
+        dag.payload,
+        createHeaders(gitRepoSettings)
+      )
     }
 
-    def createFile(request: GitRequest): Task[Response[_]] = Task {
+    def processFile(request: GitRequest): Task[Unit] = for {
+        file     <- getRawFile(request)
+        found     = file.code != StatusCode.NotFound
+        _ <- ZIO.when(!found)(createFile(request))
+        _ <- ZIO.when(found && file.body != request.content)(updateFile(request))
+    } yield ()
 
-      implicit val backend = HttpURLConnectionBackend()
+    def createFile(request: GitRequest): Task[Response[String]] = Task {
       quickRequest
         .headers(request.headers)
         .contentType("application/json")
         .body(request.asJson.noSpaces)
         .post(uri"${request.uri}")
-        .send()
+        .send[Identity]()
     }
 
-    def updateFile(request: GitRequest): Task[Response[_]] = Task {
-
-      implicit val backend = HttpURLConnectionBackend()
-
+    def updateFile(request: GitRequest): Task[Response[String]] = Task {
       quickRequest
         .headers(request.headers)
         .contentType("application/json")
         .body(request.asJson.noSpaces)
         .put(uri"${request.uri}")
-        .send()
+        .send[Identity]()
     }
 
-    def getRawFile(request: GitRequest): Task[Response[_]] = Task {
-      implicit val backend = HttpURLConnectionBackend()
 
+    def getRawFile(request: GitRequest): Task[Response[String]] = Task {
       quickRequest
         .headers(request.headers)
         .contentType("application/json")
         .get(uri"${request.uri}/raw?ref=${request.branch}")
-        .send()
+        .send[Identity]()
     }
 
+    def createPath(dag: Dag, gitRepoSettings: GitRepoSettings): String = URLEncoder.encode(s"${gitRepoSettings.path}/${dag.project}_${dag.name}.yaml", "UTF-8")
 
-    def createPath(dag: Dag, gitRepoSettings: GitRepoSettings): UIO[String] = ZIO.succeed {
-      URLEncoder.encode(s"${gitRepoSettings.path}/${dag.project}_${dag.name}.yaml", "UTF-8")
-    }
+    def createCommitMsg(dag: Dag): String = s"from ${dag.project}"
 
-    def createCommitMsg(dag: Dag): UIO[String] = ZIO.succeed(s"from ${dag.project}")
-
-    def createHeaders(gitRepoSettings: GitRepoSettings): UIO[Map[String, String]] = ZIO.succeed(
-      Map("PRIVATE-TOKEN" -> gitRepoSettings.privateToken)
-    )
+    def createHeaders(gitRepoSettings: GitRepoSettings): Map[String, String] = Map("PRIVATE-TOKEN" -> gitRepoSettings.privateToken)
   }
-
 }

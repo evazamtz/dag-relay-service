@@ -29,7 +29,7 @@ object Main extends App {
     } yield exit)
 
     // inject dependencies
-    val layers = config.live ++ storage.modules.inMemory ++ git.dummy
+    val layers = config.live ++ storage.modules.inMemory ++ git.live
     val program = logic.provideSomeLayer[ZEnv](layers)
 
     // folding errors to exit codes
