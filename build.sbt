@@ -7,6 +7,7 @@ scalaVersion := "2.13.3"
 val zioVersion = "1.0.3"
 val circeVersion = "0.12.3"
 val http4sVersion = "0.21.8"
+val zioLogVersion = "0.5.3"
 
 // Only necessary for SNAPSHOT releases
 resolvers += Resolver.sonatypeRepo("snapshots")
@@ -20,6 +21,9 @@ libraryDependencies ++= Seq(
 libraryDependencies ++= Seq(
   "dev.zio" %% "zio" % zioVersion,
   "dev.zio" %% "zio-interop-cats" % "2.2.0.1",
+
+  "dev.zio" %% "zio-logging" % zioLogVersion,
+  "dev.zio" %% "zio-logging-slf4j" % zioLogVersion,
 
   "org.http4s" %% "http4s-dsl" % http4sVersion,
   "org.http4s" %% "http4s-blaze-server" % http4sVersion,

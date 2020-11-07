@@ -1,5 +1,5 @@
 import domain._
-import zio.{Has, Task}
+import zio.{Has, Task, ULayer, ZLayer}
 
 package object crawler {
   type Crawler = Has[Service]
@@ -7,4 +7,6 @@ package object crawler {
   trait Service {
     def fetch(project:Project):Task[Map[DagName, DagPayload]]
   }
+
+  val dummy: ULayer[Crawler] = ZLayer.succeed(_ => Task{ Map[DagName,DagPayload]()} )
 }

@@ -2,7 +2,7 @@ package git
 
 import java.net.URLEncoder
 
-import domain.{Dag, GitRepoSettings}
+import domain._
 import sttp.client._
 import sttp.model.StatusCode
 import zio._
@@ -17,7 +17,11 @@ package object modules {
     // TODO: вынести в зависимость
     implicit val backend:SttpBackend[Identity, Nothing, NothingT] = HttpURLConnectionBackend()
 
-    override def syncDag(dag: Dag, gitRepoSettings: GitRepoSettings): Task[Unit] = processFile(createRequest(dag, gitRepoSettings))
+    override def syncDags(project:Project, dags:Map[DagName,DagPayload]): Task[Unit] = for {
+      _ <- ZIO.unit
+      dags2 = dags map { case ((n,p)) => Dag(project.name, n, p) }
+      _ <- ZIO.foreach_(dags2) { dag => processFile(createRequest(dag, project.git)) }
+    } yield ()
 
     case class GitRequest(uri: String, branch: String, commit_message: String, content: String, headers: Map[String, String])
 

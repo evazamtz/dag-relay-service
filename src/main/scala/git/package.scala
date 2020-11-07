@@ -11,7 +11,9 @@ package object git {
     def syncDags(project: Project, dags:Map[DagName,DagPayload]): Task[Unit]
   }
 
-  val dummy: ULayer[Git] = ZLayer.succeed(_ => Task.unit)
+  val dummy: ULayer[Git] = ZLayer.succeed[Service](new Service {
+    override def syncDags(project: Project, dags: Map[DagName, DagPayload]): Task[Unit] = Task.unit
+  })
 
   val live: ZLayer[Any, Nothing, Git] = ZLayer.succeed(new GitLive)
-}
+} 

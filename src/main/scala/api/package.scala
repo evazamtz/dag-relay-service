@@ -16,6 +16,7 @@ import io.circe.syntax._
 import org.http4s.util.CaseInsensitiveString
 import zio.sugar._
 
+
 package object api {
 
   case class ApiException(status:Status, body:String) extends Exception(status.toString() + body)
@@ -26,15 +27,15 @@ package object api {
     crawler <- ZIO.access[Crawler](_.get)
   } yield routes(dsl, storage, git, crawler)
 
-  protected def routes(dsl:Http4sDsl[Task], repo: storage.Service, theGit: git.Service, crawler: crawler.Service):HttpApp[Task] = {
+  protected def routes(dsl:Http4sDsl[Task], repo: storage.Service, theGit: git.Service, theCrawler: crawler.Service):HttpApp[Task] = {
     import dsl._
 
     def ensureProject(request: Request[Task], projectName: domain.ProjectName):Task[Project] = for {
       tokenHeader <- request.headers.get(CaseInsensitiveString("X-Project-Token")) getOrFail ApiException(BadRequest, "X-Project-Name is required")
-      token = tokenHeader.value
-      projects <- repo.getProjects
-      project  <- projects.get(projectName) getOrFail ApiException(NotFound, s"Project $projectName was not found")
-      _ <- ZIO.ensureOrFail(project.token == token, ApiException(Forbidden, s"Invalid token '$token' for project '$projectName'"))
+      token        = tokenHeader.value
+      projects    <- repo.getProjects
+      project     <- projects.get(projectName) getOrFail ApiException(NotFound, s"Project $projectName was not found")
+      _           <- ZIO.ensureOrFail(project.token == token, ApiException(Forbidden, s"Invalid token '$token' for project '$projectName'"))
     } yield project
 
     val routes:PartialFunction[Request[Task], Task[Response[Task]]] = {
@@ -54,7 +55,7 @@ package object api {
 
       case request @ POST -> Root / "projects" / projectName / "sync" => for {
         project     <- ensureProject(request, projectName)
-        dags        <- crawler.fetch(project)
+        dags        <- theCrawler.fetch(project)
         _           <- theGit.syncDags(project, dags)
         response    <- Ok(s"Synced ${dags.size} DAG(s)")
       } yield response
