@@ -1,4 +1,5 @@
-import domain.{Dag, GitRepoSettings}
+import crawler.Crawler
+import domain._
 import fs2.Stream
 import fs2.text.utf8Encode
 import git.Git
@@ -15,17 +16,27 @@ import io.circe.syntax._
 import org.http4s.util.CaseInsensitiveString
 import zio.sugar._
 
+
 package object api {
 
   case class ApiException(status:Status, body:String) extends Exception(status.toString() + body)
 
-  def buildRoutes(dsl:Http4sDsl[Task]):URIO[Storage with Git, HttpApp[Task]] = for {
+  def buildRoutes(dsl:Http4sDsl[Task]):URIO[Storage with Git with Crawler, HttpApp[Task]] = for {
     storage <- ZIO.access[Storage](_.get)
     git     <- ZIO.access[Git](_.get)
-  } yield routes(dsl, storage, git)
+    crawler <- ZIO.access[Crawler](_.get)
+  } yield routes(dsl, storage, git, crawler)
 
-  protected def routes(dsl:Http4sDsl[Task], repo: storage.Service, theGit: git.Service):HttpApp[Task] = {
+  protected def routes(dsl:Http4sDsl[Task], repo: storage.Service, theGit: git.Service, theCrawler: crawler.Service):HttpApp[Task] = {
     import dsl._
+
+    def ensureProject(request: Request[Task], projectName: domain.ProjectName):Task[Project] = for {
+      tokenHeader <- request.headers.get(CaseInsensitiveString("X-Project-Token")) getOrFail ApiException(BadRequest, "X-Project-Name is required")
+      token        = tokenHeader.value
+      projects    <- repo.getProjects
+      project     <- projects.get(projectName) getOrFail ApiException(NotFound, s"Project $projectName was not found")
+      _           <- ZIO.ensureOrFail(project.token == token, ApiException(Forbidden, s"Invalid token '$token' for project '$projectName'"))
+    } yield project
 
     val routes:PartialFunction[Request[Task], Task[Response[Task]]] = {
       case GET -> Root / "ping" => Ok("pong")
@@ -36,36 +47,18 @@ package object api {
       } yield response
 
       case request @ POST -> Root / "projects" / projectName / "dags" / dag => for {
-        tokenHeader <- request.headers.get(CaseInsensitiveString("X-Project-Token")) getOrFail ApiException(BadRequest, "X-Project-Name is required")
-        token       = tokenHeader.value
-        projects    <- repo.getProjects
-        project     <- projects.get(projectName) getOrFail ApiException(NotFound, s"Project $projectName was not found")
-        _           <- ZIO.ensureOrFail(project.token == token, ApiException(Forbidden, s"Invalid token '$token' for project '$projectName'"))
+        project     <- ensureProject(request, projectName)
         payload     <- request.body.through(fs2.text.utf8Decode).compile.string
-        _           <- theGit.syncDag(Dag(projectName, dag, payload), project.git)
-        response    <- Ok("Synced")
+        _           <- theGit.syncDags(project, Map(dag -> payload))
+        response    <- Ok("Synced 1 DAG")
       } yield response
 
-      case GET -> Root / "pushTest" => {
-
-        val source = scala.io.Source.fromFile("yaml.yaml")
-        val content = try {
-          source.getLines.mkString
-        } finally source.close()
-
-        val testDag = Dag("project", "test", content)
-        val testRepositorySettings = GitRepoSettings(
-          "https://gitlab.pimpay.ru/api/v4/projects/294/repository/files",
-          "master",
-          "dags",
-          "RtPpsq7iiFv2xQiDdU8J"
-        )
-
-        theGit.syncDag(testDag, testRepositorySettings) *> Ok("kukujopa")
-      }
-
-
-
+      case request @ POST -> Root / "projects" / projectName / "sync" => for {
+        project     <- ensureProject(request, projectName)
+        dags        <- theCrawler.fetch(project)
+        _           <- theGit.syncDags(project, dags)
+        response    <- Ok(s"Synced ${dags.size} DAG(s)")
+      } yield response
     }
 
     val routesWithErrorHandling = routes.andThen(r => r.catchAll {

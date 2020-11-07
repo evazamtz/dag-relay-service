@@ -1,3 +1,5 @@
+import java.nio.file.Path
+
 import cats.effect.ConcurrentEffect
 import config.Config
 import zio.{Task, _}
@@ -8,7 +10,8 @@ import org.http4s._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.implicits._
 import org.http4s.server.blaze.BlazeServerBuilder
-import storage.Storage
+import zio.logging._
+
 
 object Main extends App {
 
@@ -29,7 +32,8 @@ object Main extends App {
     } yield exit)
 
     // inject dependencies
-    val layers = config.live ++ storage.modules.inMemory ++ git.live
+    val logger  = Logging.console()
+    val layers  = config.live ++ storage.modules.inMemory ++ git.live ++ crawler.dummy ++ logger
     val program = logic.provideSomeLayer[ZEnv](layers)
 
     // folding errors to exit codes

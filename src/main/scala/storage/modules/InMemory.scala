@@ -1,12 +1,12 @@
 package storage
 
-import domain.{Dag, GitRepoSettings, Project}
-import zio.{Ref, Task, ZLayer}
+import domain._
+import zio.{Task, ULayer, ZLayer}
 
 package object modules {
 
-  class InMemory(projects: Ref[Map[String, Project]]) extends storage.Service {
-    override def getProjects: Task[Map[String, Project]] = projects.get
+  class InMemory(projects: Map[ProjectName, Project]) extends storage.Service {
+    override def getProjects: Task[Map[ProjectName, Project]] = Task { projects }
   }
 
   val gitRepoSettings = GitRepoSettings(
@@ -16,9 +16,7 @@ package object modules {
     "RtPpsq7iiFv2xQiDdU8J"
   )
 
-  val inMemory: ZLayer[Any, Nothing, Storage] = ZLayer.fromEffect(
-    for {
-      projects <- Ref.make(Map[String, Project]("core" -> Project("core", "jajasijdasjdaksjkakaka", "https://api.pimpay.ru/datamesh/dags", gitRepoSettings)))
-    } yield (new InMemory(projects)).asInstanceOf[storage.Service]
-  )
+  val inMemory: ULayer[Storage] = ZLayer.succeed {
+    new InMemory(Map[ProjectName, Project]("core" -> Project("core", "jajasijdasjdaksjkakaka", "https://api.pimpay.ru/datamesh/dags", gitRepoSettings))).asInstanceOf[storage.Service]
+  }
 }
