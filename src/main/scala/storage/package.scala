@@ -6,6 +6,6 @@ package object storage {
   type Storage = Has[Service]
 
   trait Service {
-    def getProjects:Task[Map[String, Project]]
+    def getProjects:Task[Map[ProjectName, Project]]
   }
 }
