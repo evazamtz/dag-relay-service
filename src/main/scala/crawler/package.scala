@@ -3,6 +3,6 @@ import zio.Task
 
 package object crawler {
   trait Service {
-    def fetch(project:Project):Task[Map[String, Dag]]
+    def fetch(project:Project):Task[Map[DagName, DagPayload]]
   }
 }
