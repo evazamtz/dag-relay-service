@@ -18,8 +18,6 @@ package object modules {
 
     implicit val backend:SttpBackend[Identity, Nothing, NothingT] = HttpURLConnectionBackend()
 
-    case class LocalDag(dagName: DagName, dagPayload: DagPayload)
-
     case class Action(action: String, file_path: String, content: String)
     case class CommitPayload(branch: String, commit_message: String, actions: Seq[Action])
     case class GitRequest(uri: String, branch: String, headers: Map[String, String])
