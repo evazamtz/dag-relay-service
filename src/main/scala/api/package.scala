@@ -31,7 +31,7 @@ package object api {
     import dsl._
 
     def ensureProject(request: Request[Task], projectName: domain.ProjectName):Task[Project] = for {
-      tokenHeader <- request.headers.get(CaseInsensitiveString("X-Project-Token")) getOrFail ApiException(BadRequest, "X-Project-Name is required")
+      tokenHeader <- request.headers.get(CaseInsensitiveString("X-Project-Token")) getOrFail ApiException(BadRequest, "X-Project-Token is required")
       token        = tokenHeader.value
       projects    <- repo.getProjects
       project     <- projects.get(projectName) getOrFail ApiException(NotFound, s"Project $projectName was not found")
@@ -59,6 +59,13 @@ package object api {
         _           <- theGit.syncDags(project, dags)
         response    <- Ok(s"Synced ${dags.size} DAG(s)")
       } yield response
+
+      // todo temporary test dags fetching
+      case GET -> Root / "test" / "dags" => Ok(
+        Json.obj("dags" -> Json.obj(
+          "test_dag_1" -> Json.fromString("name: core.test_dag_1\ntelegramConn: telegram_core\nretry_count: 2")
+        )).asJson.noSpaces
+      )
     }
 
     val routesWithErrorHandling = routes.andThen(r => r.catchAll {

@@ -33,7 +33,7 @@ object Main extends App {
 
     // inject dependencies
     val logger  = Logging.console()
-    val layers  = config.live ++ storage.modules.inMemory ++ git.live ++ crawler.dummy ++ logger
+    val layers  = config.live ++ storage.modules.inMemory ++ git.live ++ crawler.live ++ logger
     val program = logic.provideSomeLayer[ZEnv](layers)
 
     // folding errors to exit codes
