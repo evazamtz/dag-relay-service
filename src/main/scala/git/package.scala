@@ -1,5 +1,6 @@
 import domain._
 import git.modules.GitLive
+import zio.logging.{Logger, Logging}
 import zio.{Task, _}
 
 
@@ -11,9 +12,13 @@ package object git {
     def syncDags(project: Project, dags:Map[DagName,DagPayload]): Task[Unit]
   }
 
-  val dummy: ULayer[Git] = ZLayer.succeed[Service](new Service {
-    override def syncDags(project: Project, dags: Map[DagName, DagPayload]): Task[Unit] = Task.unit
-  })
+  val dummy: ULayer[Git] = ZLayer.succeed[Service]((project: Project, dags: Map[DagName, DagPayload]) => Task.unit)
 
-  val live: ZLayer[Any, Nothing, Git] = ZLayer.succeed(new GitLive)
+  def live(parallelism: Int): ZLayer[Logging, Nothing, Git] =  ZLayer.fromEffect (
+    for {
+      logging <- ZIO.access[Logging](_.get)
+    } yield new GitLive(parallelism, logging)
+  )
+
+
 } 
