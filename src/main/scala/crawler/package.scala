@@ -35,7 +35,6 @@ package object crawler {
 
     protected def makeRequest(project: Project): Task[Response[String]] = Task {
       quickRequest
-        .headers(Map.empty[String, String])
         .contentType("application/json")
         .get(uri"${project.fetchEndpoint}")
         .send[Identity]()
