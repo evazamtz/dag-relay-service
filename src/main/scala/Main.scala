@@ -34,7 +34,7 @@ object Main extends App {
     // inject dependencies
     val logger  = Logging.console()
 
-    val gitLiveLayer = logger >>> git.live(3)
+    val gitLiveLayer = (logger ++ config.live) >>> git.live
     val layers  = config.live ++ storage.modules.inMemory ++ gitLiveLayer ++ crawler.dummy ++ logger
     val program = logic.provideSomeLayer[ZEnv](layers)
 

@@ -4,8 +4,9 @@ import pureconfig.generic.auto._
 
 package object config {
 
-  case class AppConf(api:ApiConf)
+  case class AppConf(api:ApiConf, git: GitConf)
   case class ApiConf(host:String, port:Int)
+  case class GitConf(parallelism: Int)
 
   type Config = Has[Service]
 
