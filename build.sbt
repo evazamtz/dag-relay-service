@@ -40,8 +40,11 @@ libraryDependencies ++= Seq(
   "com.softwaremill.sttp.client" %% "core" % "2.2.9",
 
   "dev.zio" %% "zio-test"     % zioVersion % "test",
-  "dev.zio" %% "zio-test-sbt" % zioVersion % "test"
+  "dev.zio" %% "zio-test-sbt" % zioVersion % "test",
    // "dev.zio" %% "zio-test-magnolia" % zioVersion % "test" // optional
+
+  "com.monovore" %% "decline" % "1.3.0",
+  "com.monovore" %% "decline-effect" % "1.3.0"
 )
 
 testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")

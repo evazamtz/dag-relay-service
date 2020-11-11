@@ -55,8 +55,7 @@ package object api {
 
       case request @ POST -> Root / "projects" / projectName / "sync" => for {
         project     <- ensureProject(request, projectName)
-        dags        <- theCrawler.fetch(project)
-        _           <- theGit.syncDags(project, dags)
+        dags        <- theGit.syncProject(project).provideLayer(ZLayer.succeed(theCrawler))
         response    <- Ok(s"Synced ${dags.size} DAG(s)")
       } yield response
     }

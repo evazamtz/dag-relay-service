@@ -1,4 +1,4 @@
-import zio.{Has, Task}
+import zio._
 import domain._
 
 package object storage {
@@ -8,4 +8,6 @@ package object storage {
   trait Service {
     def getProjects:Task[Map[ProjectName, Project]]
   }
+
+  def getProjects: RIO[Storage, Map[ProjectName, Project]] = ZIO.accessM[Storage](_.get.getProjects)
 }

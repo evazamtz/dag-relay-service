@@ -21,7 +21,7 @@ object RoutesTest extends DefaultRunnableSpec {
   def spec = suite("testing http api")(
     testM("GET /ping") {
       for {
-        api      <- api.buildRoutes(dsl).provideLayer(storage.modules.inMemory ++ git.dummy)
+        api      <- api.buildRoutes(dsl).provideLayer(storage.modules.inMemory ++ git.dummy ++ crawler.dummy)
         response <- api.run(Request[Task](Method.GET, Uri(path="/ping")))
         body     <- response.body.through(fs2.text.utf8Decode).compile.string
       } yield assert(body)(equalTo("pong"))
@@ -29,7 +29,7 @@ object RoutesTest extends DefaultRunnableSpec {
 
     testM("GET /projects") {
       for {
-        api      <- api.buildRoutes(dsl).provideLayer(storage.modules.inMemory ++ git.dummy)
+        api      <- api.buildRoutes(dsl).provideLayer(storage.modules.inMemory ++ git.dummy ++ crawler.dummy)
         response <- api.run(Request[Task](Method.GET, Uri(path="/projects")))
         body     <- response.body.through(fs2.text.utf8Decode).compile.string
       } yield assert(body)(equalTo("""{"projects":["core"]}"""))
@@ -37,7 +37,7 @@ object RoutesTest extends DefaultRunnableSpec {
 
     testM("Fail on no token provided with 400 Bad Request") {
       for {
-        api      <- api.buildRoutes(dsl).provideLayer(storage.modules.inMemory ++ git.dummy)
+        api      <- api.buildRoutes(dsl).provideLayer(storage.modules.inMemory ++ git.dummy ++ crawler.dummy)
         response <- api.run(Request[Task](Method.POST, Uri(path="/projects/kek/dags/omg")))
       } yield assert(response.status.code)(equalTo(400))
     }

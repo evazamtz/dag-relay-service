@@ -2,6 +2,7 @@ package git
 
 import java.net.URLEncoder
 
+import crawler.Crawler
 import domain._
 import sttp.client._
 import sttp.model.StatusCode
@@ -22,6 +23,11 @@ package object modules {
       dags2 = dags map { case ((n,p)) => Dag(project.name, n, p) }
       _ <- ZIO.foreach_(dags2) { dag => processFile(createRequest(dag, project.git)) }
     } yield ()
+
+    override def syncProject(project: Project): RIO[Crawler, Map[DagName,DagPayload]] = for {
+      dags <- ZIO.accessM[Crawler](_.get.fetch(project))
+      _    <- syncDags(project, dags)
+    } yield dags
 
     case class GitRequest(uri: String, branch: String, commit_message: String, content: String, headers: Map[String, String])
 
