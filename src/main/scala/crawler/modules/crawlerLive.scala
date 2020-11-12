@@ -1,36 +1,39 @@
 package crawler
 
-import domain.{DagName, DagPayload, Project}
+import domain._
 import io.circe.parser.decode
-import sttp.client.{HttpURLConnectionBackend, Identity, NothingT, Response, SttpBackend, quickRequest, _}
+import sttp.client._
 import sttp.model.StatusCode
 import zio.{Task, ZIO}
 
 
 package object modules {
-
+  case class CrawlerException(status:StatusCode,
+                              statusText:String,
+                              projectName: ProjectName) extends Exception(
+    s"""error for the project $projectName,
+       | statusCode: $status
+       | error: $statusText""".stripMargin)
   class CrawlerLive extends crawler.Service {
 
     implicit val backend: SttpBackend[Identity, Nothing, NothingT] = HttpURLConnectionBackend()
 
     override def fetch(project: Project): Task[Map[DagName, DagPayload]] = for {
-      dagsStr    <- getDagsFromUrl(project)
-      found      = dagsStr.code != StatusCode.NotFound
-      dags       <- if (!found) Task.fail(new Exception("Page not found")) else ZIO.fromEither(getDagsMap(dagsStr.body))
+      dagsStr    <- getDagsFromUrl(project.name, project.fetchEndpoint)
+      found      = dagsStr.code == StatusCode.Ok
+      dags       <- if (!found) Task.fail(CrawlerException(dagsStr.code, dagsStr.statusText, project.name)) else ZIO.fromEither(getDagsMap(dagsStr.body))
     } yield (dags)
 
-    def getDagsFromUrl(project: Project): Task[Response[String]] = Task {
+    def getDagsFromUrl(projectName: ProjectName, fetchEndpoint: String): Task[Response[String]] = Task {
       quickRequest
         .contentType("application/json")
-        .get(uri"${project.fetchEndpoint}/${project.name}")
+        .get(uri"${fetchEndpoint}/${projectName}")
         .send[Identity]()
     }
 
-    def getDagsMap(string: String) = {
-      decode[Map[DagName, DagPayload]](string)
+    def getDagsMap(dag: DagMap) = {
+      decode[Map[DagName, DagPayload]](dag)
 }
-
-
   }
 
 }

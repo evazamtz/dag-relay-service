@@ -1,5 +1,6 @@
 package object domain {
   type ProjectName = String
+  type DagMap = String
   type DagName = String
   type DagPayload = String
 
