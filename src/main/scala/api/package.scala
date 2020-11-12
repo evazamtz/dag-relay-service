@@ -60,11 +60,8 @@ package object api {
         response    <- Ok(s"Synced ${dags.size} DAG(s)")
       } yield response
 
-      // todo temporary test dags fetching
-      case GET -> Root / "test" / "dags" => Ok(
-        Json.obj("dags" -> Json.obj(
-          "test_dag_1" -> Json.fromString("name: core.test_dag_1\ntelegramConn: telegram_core\nretry_count: 2")
-        )).asJson.noSpaces
+      case GET -> Root / "docs" / "endpoint-example" => Ok(
+        """{"dags": {"test_dag": "name: core.test\ntelegramConn: telegram_core\nretry_count: 2" }}"""
       )
     }
 
