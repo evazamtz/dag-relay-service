@@ -16,7 +16,7 @@ import zio.sugar._
 
 package object modules {
 
-  class GitLive(conf: config.Service, logging: Logger[String]) extends git.Service {
+  case class GitLive(parallelism: Int, logging: Logger[String]) extends git.Service {
 
     implicit val backend:SttpBackend[Identity, Nothing, NothingT] = HttpURLConnectionBackend()
 
@@ -25,8 +25,7 @@ package object modules {
     case class GitRequest(uri: String, branch: String, headers: Map[String, String])
 
     def syncDags(project: Project, dags: Map[DagName, DagPayload]) : Task[Unit] = for {
-      configApp <- conf.app
-      actions <- ZIO.collectParN(configApp.git.parallelism)(dags.toSeq) {
+      actions <- ZIO.collectParN(parallelism)(dags.toSeq) {
         case (name, payload) => (for {
            file   <- fetchRawFile(project, name)
            action <- createAction(project, name, payload, file) getOrFail(None)
@@ -37,7 +36,7 @@ package object modules {
     } yield ()
 
 
-    override def unsyncDags(project: Project, dags: Seq[DagName]): Task[Unit] = for {
+    override def desyncDags(project: Project, dags: Seq[DagName]): Task[Unit] = for {
       actions <- ZIO.foreachPar(dags)(dagName => ZIO.succeed(createDeleteAction(project, dagName)))
         _ <- ZIO.when(actions.nonEmpty) { sendCommitRequest(project, actions) }
     } yield ()
