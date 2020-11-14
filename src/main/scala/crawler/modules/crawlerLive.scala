@@ -19,15 +19,16 @@ package object modules {
     implicit val backend: SttpBackend[Identity, Nothing, NothingT] = HttpURLConnectionBackend()
 
     override def fetch(project: Project): Task[Map[DagName, DagPayload]] = for {
-      dagsStr    <- getDagsFromUrl(project.name, project.fetchEndpoint)
+      dagsStr    <- getDagsFromUrl(project.fetchEndpoint)
       found      = dagsStr.code == StatusCode.Ok
-      dags       <- if (!found) Task.fail(CrawlerException(dagsStr.code, dagsStr.statusText, project.name)) else ZIO.fromEither(getDagsMap(dagsStr.body))
+      dags       <- if (!found) Task.fail(CrawlerException(dagsStr.code, dagsStr.statusText, project.name))
+                    else ZIO.fromEither(getDagsMap(dagsStr.body)).mapError(e => new Exception(s"Parsing error: ${e.getMessage}"))
     } yield (dags)
 
-    def getDagsFromUrl(projectName: ProjectName, fetchEndpoint: String): Task[Response[String]] = Task {
+    def getDagsFromUrl(fetchEndpoint: String): Task[Response[String]] = Task {
       quickRequest
         .contentType("application/json")
-        .get(uri"${fetchEndpoint}/${projectName}")
+        .get(uri"${fetchEndpoint}")
         .send[Identity]()
     }
 
