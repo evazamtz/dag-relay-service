@@ -44,4 +44,7 @@ libraryDependencies ++= Seq(
    // "dev.zio" %% "zio-test-magnolia" % zioVersion % "test" // optional
 )
 
+libraryDependencies += "io.circe" %% "circe-optics" % "0.13.0"
+
+
 testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")

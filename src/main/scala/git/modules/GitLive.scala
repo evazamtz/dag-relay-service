@@ -12,6 +12,8 @@ import io.circe.generic.auto._
 import io.circe.syntax._
 import zio.logging._
 import zio.sugar._
+import io.circe.optics.JsonPath._
+import io.circe.parser._
 
 
 package object modules {
@@ -78,9 +80,23 @@ package object modules {
         .send[Identity]()
     }
 
+    def fetchFiles(project: Project) : Task[Response[String]] = {
+      val path = createPathForListOfFiles(project)
+
+      logging.info(path) *> Task {
+        quickRequest
+          .headers(createHeaders(project.git))
+          .contentType("application/json")
+          .get(uri"${path}")
+          .send[Identity]()
+      }
+    }
+
     def createPathForRawFile(project: Project, dagName: DagName): String = s"${project.git.repository}/files/${URLEncoder.encode(s"${project.git.path}/${project.name}_${dagName}.yaml", "UTF-8")}"
 
     def createPathForCommitPush(project: Project): String = s"${project.git.repository}/commits"
+
+    def createPathForListOfFiles(project: Project): String = s"${project.git.repository}/tree?path=${project.git.path}"
 
     def createCommitPayload(project: Project, actions: Seq[Action]): CommitPayload = CommitPayload(project.git.branch, createCommitMsg(project), actions)
 
@@ -89,5 +105,20 @@ package object modules {
     def createCommitMsg(project: Project): String = s"from ${project.name}"
 
     def createHeaders(gitRepoSettings: GitRepoSettings): Map[String, String] = Map("PRIVATE-TOKEN" -> gitRepoSettings.privateToken)
+
+    override def getNamesByProject(project: Project): Task[Seq[DagName]] = for {
+      response <- fetchFiles(project)
+      res   <- ZIO.fromEither(parse(response.body))
+      names <-  getNamesFromResponse(project, res)
+      _     <- logging.info(names.mkString(","))
+    } yield names
+
+
+    def getNamesFromResponse(project: Project, result: Json): Task[Seq[DagName]] = Task {
+      val list: List[String] = root.each.name.string.getAll(result)
+      list.map(name => parseFileName(project, name))
+    }
+
+    def parseFileName(project: Project, name: String): DagName = name.substring(project.name.length + 1, name.length - 5)
   }
 }

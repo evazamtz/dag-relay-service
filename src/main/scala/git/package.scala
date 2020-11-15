@@ -14,31 +14,23 @@ package object git {
     def syncDags(project: Project, dags:Map[DagName,DagPayload]): Task[Unit]
 
     def desyncDags(project: Project, dags:Seq[DagName]): Task[Unit]
+
+    def getNamesByProject(project: Project) : Task[Seq[DagName]]
   }
 
   val dummy: ULayer[Git] = ZLayer.succeed[Service]( new Service {
     override def syncDags(project: Project, dags: Map[DagName, DagPayload]): Task[Unit] = Task.unit
 
     override def desyncDags(project: Project, dags: Seq[DagName]): Task[Unit] = Task.unit
+
+    override def getNamesByProject(project: Project): Task[Seq[DagName]] = Task(Seq.empty[DagName])
   })
 
-  val liveFromConfig: ZLayer[Logging with Config, Nothing, Git] = {
-
-    def fromConfigAndLogging(config: ConfigService, logging: Logger[String]): ZIO[Logging with Config, Nothing, Service] = (for {
-      appConf <- config.app
-    } yield GitLive(appConf.git.parallelism, logging))
-
-    ZLayer.fromServicesM(fromConfigAndLogging _)
-
-
-  }
-  /*  ZLayer.fromEffect (
-    for {
-      logging <- ZIO.access[Logging](_.get)
-      gitConfig <- ZIO.access[Config](_.get)
-      appConf <- gitConfig.app
-    } yield GitLive(appConf.git.parallelism, logging)*/
-
+  val liveFromConfig: ZLayer[Logging with Config, Nothing, Git] =  (for {
+    logging <- ZIO.access[Logging](_.get)
+    gitConfig <- ZIO.access[Config](_.get)
+    appConf <- gitConfig.app
+  } yield GitLive(appConf.git.parallelism, logging)).toLayer
 
 
   def live(parallelism: Int): ZLayer[Logging, Nothing, Git] =  ZLayer.fromService { logging => GitLive(parallelism, logging) }
