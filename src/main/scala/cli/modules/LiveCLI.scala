@@ -3,7 +3,7 @@ package cli.modules
 import cli.CliDependencies
 import com.monovore.decline._
 import com.monovore.decline.effect._
-import domain.ProjectName
+import domain.{Project, ProjectName}
 import httpServer.HttpServer
 import zio.interop.catz.taskConcurrentInstance
 import zio._
@@ -68,19 +68,19 @@ class LiveCLI extends cli.Service {
         allProjects <- storage.getProjects
         projects    <- if (all) ZIO.succeed(allProjects.values)
                        else ZIO.foreach(projectList)(p => allProjects.get(p) getOrFail new Throwable( s"Project $p not found"))
-        git         <- ZIO.access[Git](_.get)
-        logger      <- ZIO.access[Logging](_.get)
-        crawler     <- ZIO.access[Crawler](_.get)
-        _           <- ZIO.foreach(projects.toList)(p => for {
-          _    <- logger.info(s"Syncing project ${p.name}")
-          dags <- crawler.fetch(p)
-          _    <- git.syncDags(p, dags)
-          _    <- logger.info(s"Synced ${dags.size} dags in project ${p.name}")
-        } yield ())
-        _           <- logger.info(s"Synced ${projects.size} project(s)")
+        _           <- ZIO.foreach(projects.toList)(syncProject)
+        _           <- ZIO.accessM[Logging](_.get.info(s"Synced ${projects.size} project(s)"))
       } yield ExitCode.success
     }
 
     program.map(z => z.map(c => cats.effect.ExitCode(c.code)))
   }
+
+  private def syncProject(p: Project): RIO[Logging with Crawler with Git, Unit] = for {
+    logger <- ZIO.access[Logging](_.get)
+    _      <- logger.info(s"Syncing project ${p.name}")
+    dags   <- ZIO.accessM[Crawler](_.get.fetch(p))
+    _      <- ZIO.accessM[Git](_.get.syncDags(p, dags))
+    _      <- logger.info(s"Synced ${dags.size} dags in project ${p.name}")
+  } yield ()
 }
