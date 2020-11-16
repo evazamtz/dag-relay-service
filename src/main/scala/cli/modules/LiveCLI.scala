@@ -1,6 +1,6 @@
 package cli.modules
 
-import cli.Dependencies
+import cli.CliDependencies
 import com.monovore.decline._
 import com.monovore.decline.effect._
 import domain.ProjectName
@@ -9,11 +9,13 @@ import zio.interop.catz.taskConcurrentInstance
 import zio._
 import zio.console._
 import cats.implicits._
+import crawler.Crawler
 import git.Git
+import zio.logging.Logging
 import zio.sugar._
 
 class LiveCLI extends cli.Service {
-  override def run(input: List[String]): RIO[Dependencies, zio.ExitCode] = {
+  override def run(input: List[String]): RIO[CliDependencies, zio.ExitCode] = {
     CommandIOApp.run(command, input)
       .catchAll(t => putStrLnErr(t.getMessage).as(cats.effect.ExitCode.Error))
       .map(c => zio.ExitCode(c.code))
@@ -23,7 +25,7 @@ class LiveCLI extends cli.Service {
   case class ListProjects()
   case class SyncProjects(projects: List[ProjectName], all: Boolean)
 
-  private val command = Command[RIO[Dependencies, cats.effect.ExitCode]](
+  private val command = Command[RIO[CliDependencies, cats.effect.ExitCode]](
     name   = "drs",
     header = "DAG Relay Service",
   ) {
@@ -46,7 +48,7 @@ class LiveCLI extends cli.Service {
       case ListProjects() => for {
         projects <- storage.getProjects
         _        <- ZIO.foreach(projects.toList)(proj => {
-          zio.console.putStrLn(
+          putStrLn(
             s"""
               |Project: ${proj._1}
               |  Token: ${proj._2.token}
@@ -62,18 +64,22 @@ class LiveCLI extends cli.Service {
       } yield ExitCode.success
 
       case SyncProjects(projectList, all) => for {
-        _           <- ZIO.unless(all || projectList.nonEmpty) { ZIO.fail(new Throwable("Provide project list or --all flag")) }
+        _           <- ZIO.ensureOrFail(all || projectList.nonEmpty, new Throwable("Provide project list or --all flag"))
         allProjects <- storage.getProjects
         projects    <- if (all) ZIO.succeed(allProjects.values)
                        else ZIO.foreach(projectList)(p => allProjects.get(p) getOrFail new Throwable( s"Project $p not found"))
         git         <- ZIO.access[Git](_.get)
-        _           <- ZIO.foreach(projects.toList)(git.syncProject)
-        _           <- putStrLn(s"Synced ${projects.size} project(s)")
+        logger      <- ZIO.access[Logging](_.get)
+        crawler     <- ZIO.access[Crawler](_.get)
+        _           <- ZIO.foreach(projects.toList)(p => for {
+          _    <- logger.info(s"Syncing project ${p.name}")
+          dags <- crawler.fetch(p)
+          _    <- git.syncDags(p, dags)
+          _    <- logger.info(s"Synced ${dags.size} dags in project ${p.name}")
+        } yield ())
+        _           <- logger.info(s"Synced ${projects.size} project(s)")
       } yield ExitCode.success
     }
-
-    program
-      .withDefault(daemonOpts)
 
     program.map(z => z.map(c => cats.effect.ExitCode(c.code)))
   }
