@@ -6,3 +6,7 @@ api = {
 storage = {
     backend = "inmemory"
 }
+
+git = {
+    parallelism = 3
+}

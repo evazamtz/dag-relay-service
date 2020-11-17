@@ -2,6 +2,7 @@ package git
 
 import java.net.URLEncoder
 
+import config._
 import domain._
 import sttp.client._
 import sttp.model.StatusCode
@@ -9,72 +10,115 @@ import zio._
 import io.circe._
 import io.circe.generic.auto._
 import io.circe.syntax._
+import zio.logging._
+import zio.sugar._
+import io.circe.optics.JsonPath._
+import io.circe.parser._
+
 
 package object modules {
 
-  class GitLive extends git.Service {
+  case class GitLive(parallelism: Int, logging: Logger[String]) extends git.Service {
 
-    // TODO: вынести в зависимость
     implicit val backend:SttpBackend[Identity, Nothing, NothingT] = HttpURLConnectionBackend()
 
-    override def syncDags(project:Project, dags:Map[DagName,DagPayload]): Task[Unit] = for {
-      _ <- ZIO.unit
-      dags2 = dags map { case ((n,p)) => Dag(project.name, n, p) }
-      _ <- ZIO.foreach_(dags2) { dag => processFile(createRequest(dag, project.git)) }
+    case class Action(action:String, file_path: String,  content: Option[String])
+    case class CommitPayload(branch: String, commit_message: String, actions: Seq[Action])
+    case class GitRequest(uri: String, branch: String, headers: Map[String, String])
+
+    def syncDags(project: Project, dags: Map[DagName, DagPayload]) : Task[Unit] = for {
+      actions <- ZIO.collectParN(parallelism)(dags.toSeq) {
+        case (name, payload) => (for {
+           file   <- fetchRawFile(project, name)
+           action <- createAction(project, name, payload, file) getOrFail(None)
+        } yield action).orElseFail(None)
+      }
+      _ <- logging.info(actions.mkString(","))
+      _ <- ZIO.when(actions.nonEmpty) { sendCommitRequest(project, actions) }
     } yield ()
 
-    case class GitRequest(uri: String, branch: String, commit_message: String, content: String, headers: Map[String, String])
 
-    def createRequest(dag: Dag, gitRepoSettings: GitRepoSettings): GitRequest = {
-      val path = createPath(dag, gitRepoSettings)
-
-      GitRequest(
-        s"${gitRepoSettings.repository}/$path",
-        gitRepoSettings.branch,
-        createCommitMsg(dag),
-        dag.payload,
-        createHeaders(gitRepoSettings)
-      )
-    }
-
-    def processFile(request: GitRequest): Task[Unit] = for {
-        file     <- getRawFile(request)
-        found     = file.code != StatusCode.NotFound
-        _ <- ZIO.when(!found)(createFile(request))
-        _ <- ZIO.when(found && file.body != request.content)(updateFile(request))
+    override def desyncDags(project: Project, dags: Seq[DagName]): Task[Unit] = for {
+      actions <- ZIO.foreachPar(dags)(dagName => ZIO.succeed(createDeleteAction(project, dagName)))
+        _ <- ZIO.when(actions.nonEmpty) { sendCommitRequest(project, actions) }
     } yield ()
 
-    def createFile(request: GitRequest): Task[Response[String]] = Task {
-      quickRequest
-        .headers(request.headers)
-        .contentType("application/json")
-        .body(request.asJson.noSpaces)
-        .post(uri"${request.uri}")
-        .send[Identity]()
+    def createDeleteAction(project: Project, dagName: DagName): Action = {
+      val filePath = createFilePath(project, dagName)
+      Action("delete", filePath, Option.empty[String])
     }
 
-    def updateFile(request: GitRequest): Task[Response[String]] = Task {
-      quickRequest
-        .headers(request.headers)
-        .contentType("application/json")
-        .body(request.asJson.noSpaces)
-        .put(uri"${request.uri}")
-        .send[Identity]()
+    def createAction(project: Project, dagName: DagName, dagPayload: DagPayload, file: Response[String]) : Option[Action] = {
+      val filePath = createFilePath(project, dagName)
+      val found = file.code != StatusCode.NotFound
+      if (!found) Option(Action("create", filePath, Option(dagPayload)))
+       else {
+        if (file.body != dagPayload) Option(Action("update", filePath, Option(dagPayload)))
+        else None
+      }
     }
 
 
-    def getRawFile(request: GitRequest): Task[Response[String]] = Task {
+    def sendCommitRequest(project: Project, actions : Seq[Action]): Task[Response[String]] = {
+      val path = createPathForCommitPush(project)
+
+      logging.info(path) *> Task {
+        quickRequest
+          .headers(createHeaders(project.git))
+          .contentType("application/json")
+          .body(createCommitPayload(project, actions).asJson.noSpaces)
+          .post(uri"${path}")
+          .send[Identity]()
+      }
+    }
+
+    def fetchRawFile(project: Project, name: DagName): Task[Response[String]] =  logging.info(s"${createPathForRawFile(project, name)}/raw?ref=${project.git.branch}") *>  Task {
       quickRequest
-        .headers(request.headers)
+        .headers(createHeaders(project.git))
         .contentType("application/json")
-        .get(uri"${request.uri}/raw?ref=${request.branch}")
+        .get(uri"${createPathForRawFile(project, name)}/raw?ref=${project.git.branch}")
         .send[Identity]()
     }
 
-    def createPath(dag: Dag, gitRepoSettings: GitRepoSettings): String = URLEncoder.encode(s"${gitRepoSettings.path}/${dag.project}_${dag.name}.yaml", "UTF-8")
+    def fetchFiles(project: Project) : Task[Response[String]] = {
+      val path = createPathForListOfFiles(project)
 
-    def createCommitMsg(dag: Dag): String = s"from ${dag.project}"
+      logging.info(path) *> Task {
+        quickRequest
+          .headers(createHeaders(project.git))
+          .contentType("application/json")
+          .get(uri"${path}")
+          .send[Identity]()
+      }
+    }
+
+    def createPathForRawFile(project: Project, dagName: DagName): String = s"${project.git.repository}/files/${URLEncoder.encode(s"${project.git.path}/${project.name}_${dagName}.yaml", "UTF-8")}"
+
+    def createPathForCommitPush(project: Project): String = s"${project.git.repository}/commits"
+
+    def createPathForListOfFiles(project: Project): String = s"${project.git.repository}/tree?path=${project.git.path}"
+
+    def createCommitPayload(project: Project, actions: Seq[Action]): CommitPayload = CommitPayload(project.git.branch, createCommitMsg(project), actions)
+
+    def createFilePath(project:Project, dagName: DagName): String = s"${project.git.path}/${project.name}_${dagName}.yaml"
+
+    def createCommitMsg(project: Project): String = s"from ${project.name}"
 
     def createHeaders(gitRepoSettings: GitRepoSettings): Map[String, String] = Map("PRIVATE-TOKEN" -> gitRepoSettings.privateToken)
+
+    override def getNamesByProject(project: Project): Task[Seq[DagName]] = for {
+      response <- fetchFiles(project)
+      res   <- ZIO.fromEither(parse(response.body))
+      names <-  getNamesFromResponse(project, res)
+      _     <- logging.info(names.mkString(","))
+    } yield names
+
+
+    def getNamesFromResponse(project: Project, result: Json): Task[Seq[DagName]] = Task {
+      val list: List[String] = root.each.name.string.getAll(result)
+      list.map(name => parseFileName(project, name))
+    }
+
+    def parseFileName(project: Project, name: String): DagName = name.substring(project.name.length + 1, name.length - 5)
   }
 }
