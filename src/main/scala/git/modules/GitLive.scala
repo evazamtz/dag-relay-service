@@ -43,10 +43,7 @@ package object modules {
         _ <- ZIO.when(actions.nonEmpty) { sendCommitRequest(project, actions) }
     } yield ()
 
-    def createDeleteAction(project: Project, dagName: DagName): Action = {
-      val filePath = createFilePath(project, dagName)
-      Action("delete", filePath, Option.empty[String])
-    }
+    def createDeleteAction(project: Project, dagName: DagName) = Action("delete", createFilePath(project, dagName), Option.empty)
 
     def createAction(project: Project, dagName: DagName, dagPayload: DagPayload, file: Response[String]) : Option[Action] = {
       val filePath = createFilePath(project, dagName)
@@ -54,7 +51,7 @@ package object modules {
       if (!found) Option(Action("create", filePath, Option(dagPayload)))
        else {
         if (file.body != dagPayload) Option(Action("update", filePath, Option(dagPayload)))
-        else None
+        else Option.empty
       }
     }
 
@@ -108,9 +105,9 @@ package object modules {
 
     override def getNamesByProject(project: Project): Task[Seq[DagName]] = for {
       response <- fetchFiles(project)
-      res   <- ZIO.fromEither(parse(response.body))
-      names <-  getNamesFromResponse(project, res)
-      _     <- logging.info(names.mkString(","))
+      json     <- ZIO.fromEither(parse(response.body))
+      names    <-  getNamesFromResponse(project, json)
+      _        <- logging.info(names.mkString(","))
     } yield names
 
 
