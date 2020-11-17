@@ -10,7 +10,7 @@ package object modules {
   }
 
   val gitRepoSettings = GitRepoSettings(
-    "https://gitlab.pimpay.ru/api/v4/projects/294/repository/files",
+    "https://gitlab.pimpay.ru/api/v4/projects/294/repository",
     "master",
     "dags",
     "RtPpsq7iiFv2xQiDdU8J"
