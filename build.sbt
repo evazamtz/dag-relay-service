@@ -47,4 +47,7 @@ libraryDependencies ++= Seq(
   "com.monovore" %% "decline-effect" % "1.3.0"
 )
 
+libraryDependencies += "io.circe" %% "circe-optics" % "0.13.0"
+
+
 testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")

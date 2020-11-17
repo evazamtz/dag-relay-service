@@ -11,8 +11,10 @@ object Main extends App {
     } yield exit)
 
     // inject dependencies
-    val logger  = Logging.console()
-    val layers  = config.live ++ storage.modules.inMemory ++ git.live ++ crawler.dummy ++ logger ++ cli.live ++ httpServer.live
+    val logger       = Logging.console()
+    val gitLiveLayer = (logger ++ config.live) >>> git.liveFromConfig
+    val layers       = config.live ++ storage.modules.inMemory ++ gitLiveLayer ++ crawler.dummy ++ logger ++ cli.live ++ httpServer.live
+
     val program = logic.provideSomeLayer[ZEnv](layers)
 
     // folding errors to exit codes
