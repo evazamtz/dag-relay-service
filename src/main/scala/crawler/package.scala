@@ -1,5 +1,6 @@
 import domain._
 import zio.{Has, Task, ULayer, ZLayer}
+import crawler.modules.HttpCrawler
 
 package object crawler {
   type Crawler = Has[Service]
@@ -9,4 +10,6 @@ package object crawler {
   }
 
   val dummy: ULayer[Crawler] = ZLayer.succeed(_ => Task{ Map[DagName,DagPayload]()} )
+
+  val live: ULayer[Crawler] = ZLayer.succeed(new HttpCrawler)
 }
